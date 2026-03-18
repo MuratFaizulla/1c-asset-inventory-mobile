@@ -114,13 +114,75 @@ mobile/
 
 ## Сборка APK (Android)
 
+> ⚠️ Папка `android` генерируется заново при каждом `prebuild`.
+> После этого нужно вручную настроить HTTP-доступ к серверу — два способа ниже.
+
 ### Шаг 1 — Сгенерировать папку android
 
 ```bash
 npx expo prebuild --platform android
 ```
 
-### Шаг 2 — Собрать APK
+### Шаг 2 — Разрешить HTTP запросы к серверу
+
+Android 9+ по умолчанию блокирует HTTP. Есть два способа:
+
+---
+
+#### Способ А — через AndroidManifest.xml (проще, рекомендуется)
+
+Открыть файл:
+```
+android\app\src\main\AndroidManifest.xml
+```
+
+Добавить `android:usesCleartextTraffic="true"` в тег `<application>`:
+
+```xml
+<application
+  android:usesCleartextTraffic="true"
+  android:label="@string/app_name"
+  ...
+>
+```
+
+✅ Делается один раз. Разрешает HTTP для любого IP — удобно для корпоративной сети.
+
+---
+
+#### Способ Б — через network_security_config.xml (для конкретного IP)
+
+**1.** Создать папку `xml` если её нет:
+```
+android\app\src\main\res\xml\
+```
+
+**2.** Создать файл `network_security_config.xml`:
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.1.100</domain>
+    </domain-config>
+</network-security-config>
+```
+
+Заменить `192.168.1.100` на реальный IP вашего сервера.
+
+**3.** Подключить файл в `AndroidManifest.xml`:
+```xml
+<application
+  android:networkSecurityConfig="@xml/network_security_config"
+  ...
+>
+```
+
+> ⚠️ Этот файл нужно создавать заново после каждого `npx expo prebuild`
+> и обновлять IP если он изменился.
+
+---
+
+### Шаг 3 — Собрать APK
 
 ```powershell
 cd android
@@ -163,14 +225,31 @@ android\app\build\outputs\apk\release\
 
 ---
 
+## Важные файлы Android
+
+| Файл | Описание | Коммитить? |
+|------|----------|------------|
+| `android/local.properties` | Путь к Android SDK на вашем ПК | ❌ Нет — у каждого свой |
+| `android/app/src/main/AndroidManifest.xml` | Разрешения приложения | ✅ Да |
+| `android/app/src/main/res/xml/network_security_config.xml` | Разрешённые IP для HTTP | ⚠️ Создаётся вручную после каждого prebuild |
+
+---
+
 ## Диагностика
 
-**Не подключается к серверу:**
+**Не подключается к серверу после установки APK:**
 ```
-1. Телефон и ПК в одной Wi-Fi сети
-2. Адрес сервера — 192.168.x.x:8888, без http:// и /api
+1. Убедиться что добавлен android:usesCleartextTraffic="true" в AndroidManifest.xml
+   или создан network_security_config.xml с правильным IP
+2. Телефон и ПК в одной Wi-Fi сети
 3. Открыть порт в фаерволе Windows:
    netsh advfirewall firewall add rule name="inventory" dir=in action=allow protocol=TCP localport=8888
+```
+
+**В Expo Go работает, в APK нет:**
+```
+Android 9+ блокирует HTTP запросы — не настроен AndroidManifest.xml
+Добавить android:usesCleartextTraffic="true" и пересобрать APK
 ```
 
 **Камера не работает:**
